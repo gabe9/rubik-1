@@ -420,52 +420,303 @@ def solveWhiteCorners(cube):
     This function returns the moves to fix the white corners
     """
     corner_cube = deepcopy(cube)
-    printCube(corner_cube) 
 
     solve_corner = []
 
     # Fix corner at top,2,2 (orange, blue)
     wob = findCorner(corner_cube,WHITE,ORANGE,BLUE)
-    print(wob)
     solve_wob = solveWhiteCornersCorner(wob) + ["Ui"]
     print(solve_wob)
 
     corner_cube = applySteps(corner_cube,solve_wob)
     solve_corner += solve_wob
-    printCube(corner_cube) 
 
     # Fix corner at top,2,0 (blue, red)
     wbr = findCorner(corner_cube,WHITE,BLUE,RED)
-    print(wbr)
     solve_wbr = solveWhiteCornersCorner(wbr) + ["Ui"]
     print(solve_wbr)
 
     corner_cube = applySteps(corner_cube,solve_wbr)
     solve_corner += solve_wbr
-    printCube(corner_cube) 
 
     
     # Fix corner at top,0,0 (red, green)
     wrg = findCorner(corner_cube,WHITE,RED,GREEN)
-    print(wrg)
     solve_wrg = solveWhiteCornersCorner(wrg) + ["Ui"]
     print(solve_wrg)
 
     corner_cube = applySteps(corner_cube,solve_wrg)
     solve_corner += solve_wrg
-    printCube(corner_cube) 
 
     # Fix corner at top,0,2 (green, orange)
     wgo = findCorner(corner_cube,WHITE,GREEN,ORANGE)
-    print(wgo)
     solve_wgo = solveWhiteCornersCorner(wgo) + ["Ui"]
     print(solve_wgo)
 
     corner_cube = applySteps(corner_cube,solve_wgo)
     solve_corner += solve_wgo
-    printCube(corner_cube) 
 
     return solve_corner
+
+# ================
+
+# STEP 3
+# ===============
+
+# HELPERS
+# ========
+
+def orientBottom(cur, dest):
+    if cur == dest:
+        return []
+    if cur == "front":
+        if dest == "left":
+            return ["Di"]
+        if dest == "right":
+            return ["D"]
+        if dest == "back":
+            return ["D","D"]
+    if cur == "left":
+        if dest == "front":
+            return ["D"]
+        if dest == "right":
+            return ["D","D"]
+        if dest == "back":
+            return ["Di"]
+    if cur == "right":
+        if dest == "front":
+            return ["Di"]
+        if dest == "back":
+            return ["D"]
+        if dest == "left":
+            return ["D","D"]
+    if cur == "back":
+        if dest == "front":
+            return ["D","D"]
+        if dest == "right":
+            return ["Di"]
+        if dest == "left":
+            return ["D"]
+    raise Error("Cannot orient " + cur + " to " + dest)
+
+def oppositeSide(side):
+    if side == "top":
+        return "bot"
+    if side == "bot":
+        return "top"
+    if side == "front":
+        return "back"
+    if side == "back":
+        return "front"
+    if side == "right":
+        return "left"
+    if side == "left":
+        return "right"
+    return ""
+
+def oppositeBot(side):
+    if side == "front":
+        return (2,1)
+    if side == "right":
+        return (1,0)
+    if side == "left":
+        return (1,2)
+    if side == "back":
+        return (0,1)
+
+
+# Middle Edges Moves
+
+# R first = Di, Fi, D, F, D, L, Di, Li
+leftToFront = ["Di","Fi","D","F","D","L","Di","Li"]
+
+# B first = D, L, Di, Li, Di, Fi, D, F
+frontToLeft = ["D","L","Di","Li","Di","Fi","D","F"]
+# BO
+# O first = D, F, Di, Fi, Di, Ri, D, R
+rightToFront = ["D","F","Di","Fi","Di","Ri","D","R"]
+
+# B first = Di, Ri, D, R, D, F, Di, Fi
+frontToRight = ["Di","Ri","D","R","D","F","Di","Fi"]
+
+# Fix back
+# GR
+# R first = D, B, Di, Bi, Di, Li, D, L
+leftToBack = ["D","B","Di","Bi","Di","Li","D","L"]
+
+# G first = Di, Li, D, L, D, B, Di, Bi
+backToLeft = ["Di","Li","D","L","D","B","Di","Bi"]
+
+# GO
+# O first = Di, Bi, D, B, D, R, Di, Ri
+rightToBack = ["Di","Bi","D","B","D","R","Di","Ri"]
+
+# G first = D, R, Di, Ri, Di, Bi, D, B
+backToRight = ["D","R","Di","Ri","Di","Bi","D","B"]
+
+def solveMiddleEdge(cur, dest):
+    """
+    This is used to move the edge from cur to the dest
+    @ref frontToLeft, frontToRight, rightToFront, leftToFront
+    @ref backToLeft, backToRight, rightToBack, leftToBack
+    """
+
+    # First check if already there
+    for key in cur:
+        for dkey in dest:
+            if key == dkey and cur[key] == dest[dkey]:
+                return []
+
+    # Check if in middle row somewhere
+    for key in cur:
+        if key == "bot":
+            # the correct block is on the bottom
+            break
+            
+        # we need to move this and try again
+        #if (key == "right" or key == "left"):
+           # return solveMiddleEdge({ key : (2,1) }, cur) + solveMiddleEdge({ oppositeSide(key) : (2,1) }, dest)
+        #if (key == "back" or key == "front"):  
+        if cur[key] == (1,0) or cur[key] == (1,2):
+            replace = { key : (2,1) }
+            return solveMiddleEdge(replace, cur) + solveMiddleEdge({ "bot" : oppositeBot(key) }, dest)
+
+    solved = []
+    # Orient bottom correctly
+    for key in cur:
+        if key == "bot":
+            start = "front"
+            if cur[key] == (0,1):
+                start = "front"
+            elif cur[key] == (1,0):
+                start = "left"
+            elif cur[key] == (1,2):
+                start = "right"
+            elif cur[key] == (2,1):
+                start = "back"
+
+            for dkey in dest:
+                if (dkey == "front" and dest[dkey] == (1,0)) or (dkey == "back" and dest[dkey] == (1,2)):
+                    solved += orientBottom(start,"left")
+                else:
+                    solved += orientBottom(start,"right")
+        else:
+            for dkey in dest:
+                solved += orientBottom(key,dkey)
+
+    # apply correct algorithm
+    for key in cur:
+        for dkey in dest:
+            if dkey == "front":
+                if dest[dkey] == (1,0):
+                    if key == "bot":
+                        # left to front
+                        solved += leftToFront
+                    else:
+                        # front to left
+                        solved += frontToLeft
+
+                elif dest[dkey] == (1,2):
+                    if key == "bot":
+                        # right to front
+                        solved += rightToFront
+
+                    else:
+                        # front to right
+                        solved += frontToRight
+
+            if dkey == "back":
+                if dest[dkey] == (1,0):
+                    if key == "bot":
+                        # right to back
+                        solved += rightToBack
+                    
+                    else:
+                        # back to right
+                        solved += backToRight
+                    
+                elif dest[dkey] == (1,2):
+                    if key == "bot":
+                        # left to back
+                        solved += leftToBack
+
+                    else:
+                        # back to left
+                        solved += backToLeft
+            if dkey == "left":
+                if dest[dkey] == (1,0):
+                    if key == "bot":
+                        # back to left
+                        solved += backToLeft
+                    else:
+                        # left to back
+                        solved += leftToBack
+                elif dest[dkey] == (1,2):
+                    if key == "bot":
+                        # front to left
+                        solved += frontToLeft
+                    else:
+                        # left to front
+                        solved += leftToFront
+            if dkey == "right":
+                if dest[dkey] == (1,0):
+                    if key == "bot":
+                        solved += frontToRight
+                    else:
+                        solved += rightToFront
+                elif dest[dkey] == (1,2):
+                    if key == "bot":
+                        solved += backToRight
+                    else:
+                        solved += rightToBack
+
+    print(solved)
+
+    return solved
+# =========
+
+def solveMiddleEdges(cube):
+    """
+    Used in step 3 to solve the middle edges
+    """
+    middle_cube = deepcopy(cube)
+
+    solve_middle = []
+
+    # Fix front
+    # BR
+
+    edgeBR = findEdge(middle_cube,BLUE,RED)
+    solve_BR = solveMiddleEdge(edgeBR, { "front": (1,0) })
+
+    print(solve_BR)
+    middle_cube = applySteps(middle_cube,solve_BR)
+    solve_middle += solve_BR
+
+    edgeBO = findEdge(middle_cube,BLUE,ORANGE)
+    solve_BO = solveMiddleEdge(edgeBO, { "front": (1,2) })
+
+    print(solve_BO)
+    middle_cube = applySteps(middle_cube,solve_BO)
+    solve_middle += solve_BO
+
+    edgeGR = findEdge(middle_cube,GREEN,RED)
+    solve_GR = solveMiddleEdge(edgeGR, { "back" : (1,2) })
+
+    print(solve_GR)
+    middle_cube = applySteps(middle_cube, solve_GR)
+    solve_middle += solve_GR
+
+    edgeGO = findEdge(middle_cube,GREEN,ORANGE)
+    solve_GO = solveMiddleEdge(edgeGO, { "back" : (1,0) })
+
+    print(solve_GO)
+    middle_cube = applySteps(middle_cube, solve_GO)
+    solve_middle += solve_GO
+
+    return solve_middle
+
+# ===============
 
 def solve(cube):
     """
@@ -484,13 +735,13 @@ def solve(cube):
 
     # Step 2: White Corners
     print("Step 2: Solve the White Corners\n")
-
     step_two = solveWhiteCorners(solved)
     solved = applySteps(solved, step_two)
 
     # Step 3: Middle Edges
-    #step_three = solveMiddleEdges(solved)
-    #solved = applySteps(solved, step_three)
+    print("Step 3: Solve the Middle Edges\n")
+    step_three = solveMiddleEdges(solved)
+    solved = applySteps(solved, step_three)
 
     # Step 4: Yellow Cross
     #step_four = solveYellowCross(solved)
