@@ -1,6 +1,14 @@
 from cube import *
 
 # Functions used to solve the cube
+def findColorByPosition(cube, color, position, excluded=[]):
+    for side in cube:
+        if side in excluded:
+            continue
+        if cube[side][position[0]][position[1]] == color:
+            return side
+
+    raise Error("Color " + color + " not found where at position " + str(position))
 
 def findEdge(cube, primary, secondary):
     """
@@ -670,7 +678,6 @@ def solveMiddleEdge(cur, dest):
                     else:
                         solved += rightToBack
 
-    print(solved)
 
     return solved
 # =========
@@ -718,6 +725,305 @@ def solveMiddleEdges(cube):
 
 # ===============
 
+# YELLOW CROSS HELPERS
+# ===============
+
+def hasYellowCross(side):
+    return side[0][1] == YELLOW and side[1][0] == YELLOW and side[1][2] == YELLOW and side[2][1] == YELLOW
+
+def hasLine(side):
+    return (side[0][1] == YELLOW and side[2][1] == YELLOW) or (side[1][0] == YELLOW and side[1][2] == YELLOW)
+
+def hasOne(side):
+    return (not hasLine(side)) and (not hasCrooked(side))
+
+def hasCrooked(side):
+    return (side[0][1] == YELLOW and (side[1][0] == YELLOW or side[1][2] == YELLOW)) or (side[2][1] == YELLOW and (side[1][0] == YELLOW or side[1][2] == YELLOW))
+
+def orientCrooked(side):
+    if (side[0][1] == YELLOW):
+        if (side[1][0] == YELLOW):
+            return []
+        elif (side[1][2] == YELLOW):
+            return ["Di"]
+    if (side[2][1] == YELLOW):
+        if (side[1][0] == YELLOW):
+            return ["D"]
+        elif (side[1][2] == YELLOW):
+            return ["D","D"]
+    return []
+
+def orientLine(side):
+    if (side[0][1] == YELLOW):
+        return ["D"]
+    return []
+
+
+# SOLVE THE YELLOW CROSS
+# ===============
+def solveYellowCross(cube):
+    """
+    This solves the yellow cross on the bottom
+    while not hasYellowCross:
+        1. orient correctly
+        2. perform correct algorithm
+    """
+    cross_cube = deepcopy(cube)
+
+    solved = []
+    alg_one = ["F","D","L","Di","Li","Fi"]
+    alg_two = ["F","L","D","Li","Di","Fi"]
+
+    while(not hasYellowCross(cross_cube["bot"])):
+        if (hasOne(cross_cube["bot"])):
+            solved += alg_one
+            cross_cube = applySteps(cross_cube,alg_one)
+            print(alg_one)
+        elif (hasCrooked(cross_cube["bot"])):
+            alg_crooked = orientCrooked(cross_cube["bot"]) + alg_one
+            solved += alg_crooked
+            cross_cube = applySteps(cross_cube,alg_crooked)
+            print(alg_crooked)
+        elif (hasLine(cross_cube["bot"])):
+            alg_line = orientLine(cross_cube["bot"]) + alg_two
+            solved += alg_line
+            cross_cube = applySteps(cross_cube,alg_line)
+            print(alg_line)
+    return solved
+
+# ===============
+
+# YELLOW CORNERS HELPERS
+# ===============
+def numYellowCorners(side):
+    num = 0
+    if (side[0][0] == YELLOW):
+        num += 1
+    if (side[0][2] == YELLOW):
+        num += 1
+    if (side[2][0] == YELLOW):
+        num += 1
+    if (side[2][2] == YELLOW):
+        num += 1
+
+    return num
+
+def hasYellowCorners(side):
+    return numYellowCorners(side) == 4
+
+def findYellowCornerSide(bot):
+    if (bot[0][0] == YELLOW):
+        return "left"
+    if (bot[0][2] == YELLOW):
+        return "front"
+    if (bot[2][0] == YELLOW):
+        return "back"
+    if (bot[2][2] == YELLOW):
+        return "right"
+    
+    raise Error("No yellow corners on bot")
+
+def orientYellowCorner(cube,side):
+    current_side = "front"
+    if (side == "bot"):
+        # find corner on bot
+        current_side = findYellowCornerSide(cube["bot"])
+        side = "front"
+    elif (side == "right"):
+        current_side = findColorByPosition(cube,YELLOW,(2,0),excluded=["top","bot"])
+    elif (side == "front"):
+        current_side = findColorByPosition(cube,YELLOW,(2,2),excluded=["top","bot"])
+    return orientBottom(current_side,side) 
+
+# SOLVE YELLOW CORNERS
+# ===============
+def solveYellowCorners(cube):
+    """
+    This function solves the yellow corners
+    while not hasYellowCorners:
+        Down is Top: R, U, Ri, U, R, U, U, Ri
+        No Corners: orient Y on right:(2,0)
+        One Corner: orient corner on bot:(2,0)
+        Any Two Corners: orient Y on front(2,2)
+    """
+    corner_cube = deepcopy(cube)
+
+    solved = []
+    alg = ["L","D","Li","D","L","D","D","Li"]
+
+    while(not hasYellowCorners(corner_cube["bot"])):
+        alg_corners = []
+        num_corners = numYellowCorners(corner_cube["bot"])
+        if (num_corners == 0):
+            # orient Y on right:(2,0)
+            alg_corners += orientYellowCorner(corner_cube,"right")
+        elif (num_corners == 1):
+            # orient Y on bot:(2,0)
+            alg_corners += orientYellowCorner(corner_cube,"bot")
+        else:
+            # orient Y on front(2,2)
+            alg_corners += orientYellowCorner(corner_cube,"front")
+
+        alg_corners += alg
+        corner_cube = applySteps(corner_cube,alg_corners)
+        print(alg_corners)
+        solved += alg_corners
+
+    return solved
+
+# ===============
+
+# SWAP CORNERS HELPERS
+# ===============
+def hasProperCorners(cube):
+    for side in cube:
+        if (not side == "top") and (not side == "bot"):
+            if (not cube[side][2][0] == cube[side][2][2]):
+                return False
+    return True
+
+def findCorrectCornerSide(cube):
+    for side in cube:
+        if (not side == "top") and (not side == "bot"):
+            if (cube[side][2][0] == cube[side][2][2]):
+                return side
+    
+    return None
+
+# SOLVE SWAP CORNERS
+# ===============
+def solveSwapCorners(cube):
+    """
+    This function swaps the corners to place them in the proper position
+    Ri,F,Ri,B,B,R,Fi,Ri,B,B,R,R,Ui
+    while not hasProperCorners(swap_cube):
+        position correct corners in back
+        apply alg
+
+    orient bottom correctly
+    """
+    swap_cube = deepcopy(cube)
+
+    solved = []
+    alg = ["Li","F","Li","B","B","L","Fi","Li","B","B","L","L","Di"]
+
+    while (not hasProperCorners(swap_cube)):
+        current_alg = []
+        
+        correct_side = findCorrectCornerSide(swap_cube)
+        if (not correct_side == None):
+            current_alg += orientBottom(correct_side,"back")
+        current_alg += alg
+        print(current_alg)
+
+        swap_cube = applySteps(swap_cube,current_alg)
+        solved += current_alg
+
+    # might need to orient bottom correctly
+    orient = orientBottom(findColorByPosition(swap_cube,BLUE,(2,2),excluded=["top","bot"]),"front")
+    solved += orient     
+    print(orient)
+    return solved
+
+# ===============
+
+# ROTATE EDGES HELPERS
+# ===============
+def hasCorrectEdges(cube):
+    for side in cube:
+        if (not side == "top") and (not side == "bot"):
+            if (not cube[side][2][0] == cube[side][2][1]):
+                return False
+    return True
+
+def oppositeColor(color):
+    if (color == BLUE):
+        return GREEN
+    if (color == GREEN):
+        return BLUE
+    
+    if (color == RED):
+        return ORANGE
+    if (color == ORANGE):
+        return RED
+
+    if (color == WHITE):
+        return YELLOW
+    if (color == YELLOW):
+        return WHITE
+
+    raise Error("Invalid Color")
+
+def decideRotation(cube,color):
+    edge = findColorByPosition(cube,color,(2,1),excluded=["top","bot"])
+    corner = findColorByPosition(cube,color,(2,0),excluded=["top","bot"])
+
+    diff = orientBottom(edge,corner)
+    
+    if (len(diff) == 0):
+        return decideRotation(cube,oppositeColor(color))
+
+    if (len(diff) == 2):
+        return True
+    if (diff[0] == "D"):
+        return True
+    if (diff[0] == "Di"):
+        return False
+
+    return False
+
+def findProperSide(cube):
+    for side in cube:
+        if side not in ["top","bot"]:
+            row = getRow(cube,side,2)
+            if (row[0] == row[1] and row[0] == row[2]):
+                return side
+    return None
+
+# Solve Rotate Edges
+# ===============
+def solveRotateEdges(cube):
+    """
+    This function rotates the bottom edges until they are correct
+    Clockwise: F, F, U, L, Ri, F, F, Li, R, U, F, F
+    Counter:   F, F, Ui, L, Ri, F, F, Li, R, Ui, F F
+    """
+    rotate_cube = deepcopy(cube)
+
+    solved = []
+
+    clock_alg = ["F","F","D","R","Li","F","F","Ri","L","D","F","F"]
+    counter_alg = ["F","F","Di","R","Li","F","F","Ri","L","Di","F","F"]
+
+    while (not hasCorrectEdges(rotate_cube)):
+        # clockwise or counter?
+        current_alg = []
+
+        needsClockwise = decideRotation(rotate_cube,BLUE)
+        
+        # orient proper side to back
+        proper_side = findProperSide(rotate_cube)
+        if (proper_side):
+            current_alg += orientBottom(proper_side,"back")
+ 
+        if (needsClockwise):
+            current_alg += clock_alg
+        else:
+            current_alg += counter_alg
+
+        rotate_cube = applySteps(rotate_cube,current_alg)
+
+        print(current_alg)
+        solved += current_alg
+
+    # might need to orient bottom correctly
+    orient = orientBottom(findColorByPosition(rotate_cube,BLUE,(2,1),excluded=["top","bot"]),"front")
+    solved += orient     
+    print(orient)
+    return solved
+
+# ===============
+
 def solve(cube):
     """
     This function solves the cube and outputs the moves to do so
@@ -728,7 +1034,6 @@ def solve(cube):
     print("Step 1: Solve the White Cross\n")
     
     step_one = solveWhiteCross(solved)
-    print(step_one)
     solved = applySteps(solved, step_one)
     if (not hasWhiteCross(solved)):
         raise Error("White Cross not solved")
@@ -744,20 +1049,24 @@ def solve(cube):
     solved = applySteps(solved, step_three)
 
     # Step 4: Yellow Cross
-    #step_four = solveYellowCross(solved)
-    #solved = applySteps(solved, step_four)
+    print("Step 4: Solve the Yellow Cross\n")
+    step_four = solveYellowCross(solved)
+    solved = applySteps(solved, step_four)
 
     # Step 5: Yellow Corners
-    #step_five = solveYellowCorners(solved)
-    #solved = applySteps(solved, step_five)
+    print("Step 5: Solve the Yellow Corners\n")
+    step_five = solveYellowCorners(solved)
+    solved = applySteps(solved, step_five)
 
     # Step 6: Swap Corners
-    #step_six = solveSwapCorners(solved)
-    #solved = applySteps(solved, step_six)
+    print("Step 6: Swap the Corners\n")
+    step_six = solveSwapCorners(solved)
+    solved = applySteps(solved, step_six)
 
     # Step 7: Rotate Edges
-    #step_seven = solveRotateEdges(solved)
-    #solved = applySteps(solved, step_seven)
+    print("Step 7: Rotate the Edges\n")
+    step_seven = solveRotateEdges(solved)
+    solved = applySteps(solved, step_seven)
 
     return solved
 
